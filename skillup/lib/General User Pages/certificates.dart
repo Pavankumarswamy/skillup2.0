@@ -101,7 +101,7 @@ class _CertificatesPageState extends State<CertificatesPage> {
                   crossAxisCount: 2, // Two certificates per row
                   crossAxisSpacing: 16,
                   mainAxisSpacing: 16,
-                  childAspectRatio: 0.75, // Adjust for card height/width ratio
+                  childAspectRatio: 1.023, // Adjust for card height/width ratio
                 ),
                 itemCount: certificates.length,
                 itemBuilder: (context, index) {

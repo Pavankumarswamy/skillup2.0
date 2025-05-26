@@ -75,6 +75,7 @@ dependencies:
   confetti: ^0.7.0         # Added for success animation
   flutter_launcher_icons: ^0.14.3
   google_sign_in_web: ^0.12.4+4
+  youtube_player_iframe: ^5.1.0
 
 dev_dependencies:
   flutter_test:

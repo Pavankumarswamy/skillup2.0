@@ -1,11 +1,11 @@
-import '/Mentor%20Pages/quiz.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_html/flutter_html.dart';
-import 'package:youtube_player_flutter/youtube_player_flutter.dart';
+import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 import 'dart:convert';
+import '/Mentor Pages/quiz.dart';
 
 class CourseContentPage extends StatefulWidget {
   final String courseId;
@@ -68,14 +68,14 @@ class _CourseContentPageState extends State<CourseContentPage> {
   }
 
   void _fetchModules() async {
-    User? user = FirebaseAuth.instance.currentUser; // Get current user
+    User? user = FirebaseAuth.instance.currentUser;
 
     if (user == null) {
       print("User not logged in!");
       return;
     }
 
-    String userId = user.uid; // Get user ID from Firebase Auth
+    String userId = user.uid;
 
     DatabaseReference userRef = FirebaseDatabase.instance.ref("users/$userId");
 
@@ -88,7 +88,6 @@ class _CourseContentPageState extends State<CourseContentPage> {
             userData['membershipPlan'] == 'true' ||
             userData['membershipPlan'] == true;
 
-        // Fetch module names regardless of purchase status
         _database.child(widget.courseId).child("modules").once().then((event) {
           if (event.snapshot.value != null) {
             Map<dynamic, dynamic> values =
@@ -107,7 +106,6 @@ class _CourseContentPageState extends State<CourseContentPage> {
                   userData['purchasedCourses'] != null &&
                   userData['purchasedCourses'][widget.courseId] == true;
 
-              // If the user has a membership plan, show the content
               if (membershipPlan || hasPurchased) {
                 try {
                   parsedContent = json.decode(moduleData["content"]);
@@ -121,12 +119,8 @@ class _CourseContentPageState extends State<CourseContentPage> {
                 "heading": title,
                 "index": moduleIndex,
                 "content":
-                    (membershipPlan || hasPurchased)
-                        ? parsedContent
-                        : null, // Show content only if purchased or with membership
-                "locked":
-                    !(membershipPlan ||
-                        hasPurchased), // Lock the module if not purchased or not having membership
+                    (membershipPlan || hasPurchased) ? parsedContent : null,
+                "locked": !(membershipPlan || hasPurchased),
               });
             });
 
@@ -148,20 +142,55 @@ class _CourseContentPageState extends State<CourseContentPage> {
     setState(() {
       _isFullScreen = isFullScreen;
       if (isFullScreen) {
-        // Allow landscape for full-screen
         SystemChrome.setPreferredOrientations([
           DeviceOrientation.landscapeLeft,
           DeviceOrientation.landscapeRight,
         ]);
-        // Hide system UI for immersive experience
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       } else {
-        // Restore portrait on exit
         SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-        // Show system UI
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       }
     });
+  }
+
+  Widget _buildYouTubePlayer(String videoUrl) {
+    String? videoId = YoutubePlayerController.convertUrlToId(videoUrl);
+    if (videoId == null || videoId.isEmpty) {
+      return const Text('Invalid YouTube URL');
+    }
+
+    YoutubePlayerController controller = YoutubePlayerController.fromVideoId(
+      videoId: videoId,
+      autoPlay: false,
+      params: const YoutubePlayerParams(
+        showControls: true,
+        showFullscreenButton: true,
+        enableCaption: false,
+        strictRelatedVideos: true,
+      ),
+    );
+
+    // controller.listen((value) {
+    //   if (value.isFullScreen != _isFullScreen) {
+    //     _toggleFullScreen(value.isFullScreen);
+    //   }
+    // });
+
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.blue, width: 3),
+        borderRadius: BorderRadius.circular(25),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: YoutubePlayer(
+          controller: controller,
+          aspectRatio: 16 / 9,
+          backgroundColor: Colors.black,
+        ),
+      ),
+    );
   }
 
   Widget _buildContentBlock(Map<String, dynamic> block) {
@@ -180,20 +209,7 @@ class _CourseContentPageState extends State<CourseContentPage> {
         ),
       );
     } else if (type == "youtubevideo") {
-      String? videoId = YoutubePlayer.convertUrlToId(content);
-      if (videoId == null || videoId.isEmpty) {
-        return Text(
-          "Invalid YouTube video URL",
-          style: TextStyle(color: Colors.red),
-        );
-      }
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: YoutubePlayerWidget(
-          videoId: videoId,
-          onFullScreenToggle: _toggleFullScreen,
-        ),
-      );
+      return _buildYouTubePlayer(content);
     } else if (type == "imageurl") {
       return _buildImage(content);
     } else if (type == "code") {
@@ -444,8 +460,7 @@ class _CourseContentPageState extends State<CourseContentPage> {
                       ),
                     ),
                   ),
-                  if (isLocked)
-                    Icon(Icons.lock, color: Colors.red), // Lock icon if locked
+                  if (isLocked) Icon(Icons.lock, color: Colors.red),
                 ],
               ),
               trailing: Icon(
@@ -514,89 +529,5 @@ class _CourseContentPageState extends State<CourseContentPage> {
         ],
       ),
     );
-  }
-}
-
-class YoutubePlayerWidget extends StatefulWidget {
-  final String videoId;
-  final Function(bool) onFullScreenToggle;
-
-  const YoutubePlayerWidget({
-    super.key,
-    required this.videoId,
-    required this.onFullScreenToggle,
-  });
-
-  @override
-  _YoutubePlayerWidgetState createState() => _YoutubePlayerWidgetState();
-}
-
-class _YoutubePlayerWidgetState extends State<YoutubePlayerWidget> {
-  late YoutubePlayerController _controller;
-  bool _lastFullScreenState = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = YoutubePlayerController(
-      initialVideoId: widget.videoId,
-      flags: YoutubePlayerFlags(
-        autoPlay: false,
-        disableDragSeek: true,
-        enableCaption: false,
-        showLiveFullscreenButton: true,
-      ),
-    );
-  }
-
-  void _handleFullScreenChange(bool isFullScreen) {
-    if (isFullScreen != _lastFullScreenState) {
-      _lastFullScreenState = isFullScreen;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        widget.onFullScreenToggle(isFullScreen);
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ValueListenableBuilder(
-      valueListenable: _controller,
-      builder: (context, YoutubePlayerValue value, child) {
-        if (value.isReady) {
-          _handleFullScreenChange(value.isFullScreen);
-        }
-        return Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 6,
-                offset: Offset(0, 3),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: YoutubePlayer(
-              controller: _controller,
-              showVideoProgressIndicator: true,
-              progressColors: ProgressBarColors(
-                playedColor: Colors.blueAccent,
-                handleColor: Colors.blueAccent[400]!,
-              ),
-              aspectRatio: 16 / 9,
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
   }
 }
